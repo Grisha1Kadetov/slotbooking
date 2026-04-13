@@ -1,0 +1,62 @@
+services:
+  postgres:
+    image: postgres:15
+    container_name: room-booking-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-db}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    networks:
+      - infrastructure_network
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-user} -d ${POSTGRES_DB:-db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    build:
+      context: .
+      dockerfile: migration.Dockerfile
+    container_name: booking-migrate
+    networks:
+      - infrastructure_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-db}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+
+  booking-service:
+    build: .
+    container_name: booking-service
+    ports:
+      - "${PORT:-8080}:8080"
+    networks:
+      - infrastructure_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_DB: ${POSTGRES_DB:-db}
+      POSTGRES_USER: ${POSTGRES_USER:-user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      PORT: ${PORT:-8080}
+
+volumes:
+  pgdata:
+
+networks:
+  infrastructure_network:

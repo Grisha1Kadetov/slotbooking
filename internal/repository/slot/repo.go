@@ -82,6 +82,11 @@ func (repo *SlotRepository) CreateBulk(ctx context.Context, slots []slot.Slot) (
 
 func (repo *SlotRepository) GetAvailableByRoomIdAndDate(ctx context.Context, roomID uuid.UUID, date time.Time) ([]slot.Slot, error) {
 	nextDate := date.AddDate(0, 0, 1)
+	lowerBound := date
+	now := time.Now().UTC()
+	if now.After(lowerBound) {
+		lowerBound = now
+	}
 
 	query, args, _ := psq.Select(
 		"s.id",
@@ -92,7 +97,7 @@ func (repo *SlotRepository) GetAvailableByRoomIdAndDate(ctx context.Context, roo
 		From("slots s").
 		LeftJoin("bookings b ON b.slot_id = s.id AND b.status = 'active'").
 		Where(sq.Eq{"s.room_id": roomID}).
-		Where("s.start_at >= ? AND s.start_at < ?", date, nextDate).
+		Where("s.start_at >= ? AND s.start_at < ?", lowerBound, nextDate).
 		Where("b.slot_id IS NULL").
 		OrderBy("s.start_at ASC").
 		ToSql()

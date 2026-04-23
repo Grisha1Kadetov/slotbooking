@@ -105,6 +105,7 @@ func (s *SlotService) GetAvailableByRoomIdAndDate(ctx context.Context, roomID uu
 	}
 
 	date = dateWithTime(date, 0, 0).UTC()
+	now := time.Now().UTC()
 
 	hasSlots, err := s.slotRepo.HasAnyByRoomIdAndDate(ctx, roomID, date)
 	if err != nil {
@@ -129,7 +130,15 @@ func (s *SlotService) GetAvailableByRoomIdAndDate(ctx context.Context, roomID uu
 		}
 		return nil, err
 	}
-	return slots, nil
+
+	availableSlots := make([]slot.Slot, 0, len(slots))
+	for _, generatedSlot := range slots {
+		if !generatedSlot.StartAt.UTC().Before(now) {
+			availableSlots = append(availableSlots, generatedSlot)
+		}
+	}
+
+	return availableSlots, nil
 }
 
 func equalWeekday(w time.Weekday, i int) bool {
